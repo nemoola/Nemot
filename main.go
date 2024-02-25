@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
@@ -9,7 +10,9 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/sashabaranov/go-openai"
 	"google.golang.org/api/option"
+	"math/big"
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -181,6 +184,48 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		default:
 			_, _ = s.ChannelMessageSend(m.ChannelID, "Unknown command")
 		}
+	}
+
+	if rnd, _ := rand.Int(rand.Reader, big.NewInt(10)); rnd.Int64() == 0 {
+		msgs, _ := s.ChannelMessages(m.ChannelID, 3, "", "", "")
+		sort.Slice(msgs, func(i, j int) bool {
+			return msgs[j].Timestamp.After(msgs[i].Timestamp)
+		})
+
+		var messages []openai.ChatCompletionMessage
+		messages = append(messages, openai.ChatCompletionMessage{
+			Role: openai.ChatMessageRoleSystem,
+			Content: strings.Join([]string{
+				"あなたはランダムの確率でチャットを取得するbotです。その与えられたチャットに対して文章の意味がわからない場合は適当に返信して短く返信をするbotです。",
+				"その与えられたチャットに対して文章の意味がわからない場合は適当に返信してください。",
+				"意味がわかる場合はその会話にまじるように返信してください。",
+				"返信は短くお願いします。",
+			}, "\n"),
+		})
+
+		for _, msg := range msgs {
+			messages = append(messages, openai.ChatCompletionMessage{
+				Role:    openai.ChatMessageRoleUser,
+				Content: msg.Content,
+			})
+		}
+
+		client := openai.NewClient(os.Getenv("CHATGPT_KEY"))
+		resp, err := client.CreateChatCompletion(
+			context.Background(),
+			openai.ChatCompletionRequest{
+				Model:    openai.GPT3Dot5Turbo0125,
+				Messages: messages,
+			},
+		)
+
+		if err != nil {
+			_, _ = s.ChannelMessageSend(m.ChannelID, err.Error())
+			return
+		}
+
+		fmt.Println(resp.Choices[0].Message.Content)
+		_, _ = s.ChannelMessageSendReply(m.ChannelID, resp.Choices[0].Message.Content, m.Reference())
 	}
 
 	var onMention = false
