@@ -186,7 +186,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}
 
-	if rnd, _ := rand.Int(rand.Reader, big.NewInt(10)); rnd.Int64() == 0 {
+	if rnd, _ := rand.Int(rand.Reader, big.NewInt(100)); rnd.Int64() <= 30 {
 		msgs, _ := s.ChannelMessages(m.ChannelID, 3, "", "", "")
 		sort.Slice(msgs, func(i, j int) bool {
 			return msgs[j].Timestamp.After(msgs[i].Timestamp)
