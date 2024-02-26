@@ -231,7 +231,13 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			}
 
 			fmt.Println(resp.Choices[0].Message.Content)
-			_, _ = s.ChannelMessageSendReply(m.ChannelID, resp.Choices[0].Message.Content, m.Reference())
+			_, _ = s.ChannelMessageSendComplex(m.ChannelID, &discordgo.MessageSend{
+				Content:   resp.Choices[0].Message.Content,
+				Reference: m.Reference(),
+				AllowedMentions: &discordgo.MessageAllowedMentions{
+					RepliedUser: false,
+				},
+			})
 		}
 	}
 
