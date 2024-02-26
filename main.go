@@ -185,7 +185,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			_, _ = s.ChannelMessageSend(m.ChannelID, "Unknown command")
 		}
 	} else {
-		if rnd, _ := rand.Int(rand.Reader, big.NewInt(100)); rnd.Int64() <= 30 {
+		if rnd, _ := rand.Int(rand.Reader, big.NewInt(100)); rnd.Int64() < 15 {
 			msgs, _ := s.ChannelMessages(m.ChannelID, 3, "", "", "")
 			sort.Slice(msgs, func(i, j int) bool {
 				return msgs[j].Timestamp.After(msgs[i].Timestamp)
