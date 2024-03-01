@@ -1,34 +1,35 @@
 package main
 
 import (
+	"Nemot/commands"
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
-	"github.com/google/generative-ai-go/genai"
 	"github.com/joho/godotenv"
 	"github.com/sashabaranov/go-openai"
-	"google.golang.org/api/option"
 	"math/big"
 	"os"
 	"sort"
 	"strings"
 )
 
-type Chinese struct {
-	Chinese  string `json:"chinese"`
-	Reading  string `json:"reading"`
-	Meanings []struct {
-		Word    string `json:"word"`
-		Meaning string `json:"meaning"`
-	} `json:"meanings"`
-}
+var (
+	prefix     = ""
+	commandMap = map[string]commands.Command{
+		"args": &commands.Args{},
+		"j2c":  &commands.J2c{},
+		"ping": &commands.Ping{},
+	}
+)
 
 func main() {
 	if err := godotenv.Load(); err != nil {
 		panic(err)
 	}
+
+	prefix = os.Getenv("PREFIX")
+
 	bot, err := discordgo.New(fmt.Sprintf("Bot %s", os.Getenv("DISCORD_TOKEN")))
 	if err != nil {
 		panic(err)
@@ -56,132 +57,20 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	if strings.HasPrefix(m.Content, "n!") {
-		command := strings.Split(m.Content, " ")[0][len("n!"):]
+	DisplayName := func() string {
+		if m.Member.Nick != "" {
+			return m.Member.Nick
+		} else {
+			return m.Author.GlobalName
+		}
+	}
+
+	if strings.HasPrefix(m.Content, prefix) {
+		commandName := strings.Split(m.Content, " ")[0][len(prefix):]
 		args := strings.Split(m.Content, " ")[1:]
-		switch command {
-		case "gj2c":
-			ctx := context.Background()
-			client, err := genai.NewClient(ctx, option.WithAPIKey(os.Getenv("GEMINI_KEY")))
-			if err != nil {
-				return
-			}
-
-			resp, err := client.GenerativeModel("gemini-pro").GenerateContent(ctx, genai.Text(strings.Join([]string{
-				"あなたは私が簡体字の中国語を学習するために存在しています。",
-				"中文とピンインとそれぞれ意味を回答してください。",
-				"回答はすべてjsonで返してください。",
-				"テンプレートは以下の通りです。",
-				`{"chinese":"", "reading":"", "meanings":[{"word":"", "meaning":""}]}`,
-				"以下は例です。",
-				"input: あなたは猫が好きですか？",
-				`output: {"chinese":"你喜欢猫吗？", "reading":"nǐ xǐ huān māo ma？", "meanings":[{"word":"你", "meaning":"あなた"}, {"word":"喜欢", "meaning":"好き"}, {"word":"猫", "meaning":"猫"}, {"word":"吗", "meaning":"〜ですか？"}]}`,
-				"input: 私は中国語を勉強中です",
-				`output: {"chinese":"我正在学习中文", "reading":"wǒ zhèng zài xué xí zhōng wén", "meanings":[{"word":"我", "meaning":"私"}, {"word":"正在", "meaning":"している"}, {"word":"学习", "meaning":"勉強する"}, {"word":"中文", "meaning":"中国語"}]}`,
-			}, "\n")), genai.Text(strings.Join(args, " ")))
-
-			if err != nil {
-				_, _ = s.ChannelMessageSend(m.ChannelID, err.Error())
-				return
-			}
-
-			var chinese Chinese
-			if err = json.Unmarshal([]byte(fmt.Sprint(resp.Candidates[0].Content.Parts[0])), &chinese); err != nil {
-				_, _ = s.ChannelMessageSend(m.ChannelID, err.Error())
-				return
-			}
-
-			embed := discordgo.MessageEmbed{}
-			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-				Name:  "中文",
-				Value: chinese.Chinese,
-			})
-			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-				Name:  "読み方",
-				Value: chinese.Reading,
-			})
-			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-				Name: "意味",
-				Value: func() string {
-					var str string
-					for _, v := range chinese.Meanings {
-						str += fmt.Sprintf("%s - %s\n", v.Word, v.Meaning)
-					}
-					return str
-				}(),
-			})
-			embed.Color = 0x1a5fb4
-			_, _ = s.ChannelMessageSendEmbed(m.ChannelID, &embed)
-		case "j2c":
-			client := openai.NewClient(os.Getenv("CHATGPT_KEY"))
-			resp, err := client.CreateChatCompletion(
-				context.Background(),
-				openai.ChatCompletionRequest{
-					Model: openai.GPT3Dot5Turbo0125,
-					Messages: []openai.ChatCompletionMessage{
-						{
-							Role: openai.ChatMessageRoleSystem,
-							Content: strings.Join([]string{
-								"あなたは私が簡体字の中国語を学習するために存在しています。",
-								"中文とピンインとそれぞれ意味を回答してください。",
-								"意味は日本語で答えてください。",
-								"回答はすべてjsonで返してください。",
-								"テンプレートは以下の通りです。",
-								`{"chinese":"", "reading":"", "meanings":[{"word":"", "meaning":""}]}`,
-								"以下は例です。",
-								"input: あなたは猫が好きですか？",
-								`output: {"chinese":"你喜欢猫吗？", "reading":"nǐ xǐ huān māo ma？", "meanings":[{"word":"你", "meaning":"あなた"}, {"word":"喜欢", "meaning":"好き"}, {"word":"猫", "meaning":"猫"}, {"word":"吗", "meaning":"〜ですか？"}]}`,
-								"input: 私は中国語を勉強中です",
-								`output: {"chinese":"我正在学习中文", "reading":"wǒ zhèng zài xué xí zhōng wén", "meanings":[{"word":"我", "meaning":"私"}, {"word":"正在", "meaning":"している"}, {"word":"学习", "meaning":"勉強する"}, {"word":"中文", "meaning":"中国語"}]}`,
-							}, "\n"),
-						},
-						{
-							Role:    openai.ChatMessageRoleUser,
-							Content: strings.Join(args, " "),
-						},
-					},
-				},
-			)
-
-			fmt.Println(resp.Choices[0].Message.Content)
-
-			if err != nil {
-				_, _ = s.ChannelMessageSend(m.ChannelID, err.Error())
-				return
-			}
-
-			var chinese Chinese
-			if err = json.Unmarshal([]byte(resp.Choices[0].Message.Content), &chinese); err != nil {
-				_, _ = s.ChannelMessageSend(m.ChannelID, err.Error())
-				return
-			}
-
-			embed := discordgo.MessageEmbed{}
-			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-				Name:  "中文",
-				Value: chinese.Chinese,
-			})
-			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-				Name:  "読み方",
-				Value: chinese.Reading,
-			})
-			embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-				Name: "意味",
-				Value: func() string {
-					var str string
-					for _, v := range chinese.Meanings {
-						str += fmt.Sprintf("%s - %s\n", v.Word, v.Meaning)
-					}
-					return str
-				}(),
-			})
-			embed.Color = 0x1a5fb4
-			_, _ = s.ChannelMessageSendEmbed(m.ChannelID, &embed)
-		case "ping":
-			_, _ = s.ChannelMessageSend(m.ChannelID, "Pong!")
-		case "args":
-			_, _ = s.ChannelMessageSend(m.ChannelID, strings.Join(args, " "))
-		default:
+		if command, exist := commandMap[commandName]; exist {
+			command.Execute(s, m, args)
+		} else {
 			_, _ = s.ChannelMessageSend(m.ChannelID, "Unknown command")
 		}
 	} else {
@@ -195,14 +84,30 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			messages = append(messages, openai.ChatCompletionMessage{
 				Role: openai.ChatMessageRoleSystem,
 				Content: strings.Join([]string{
-					"あなたはランダムの確率でチャットを取得するbotです。その与えられたチャットに対して文章の意味がわからない場合は適当に返信して短く返信をするbotです。",
-					"その与えられたチャットに対して文章の意味がわからない場合は適当に返信してください。",
-					"意味がわかる場合はその会話にまじるように返信してください。",
+					fmt.Sprintf("あなたの名前は%sです。", DisplayName()),
+					"あなたは会話の一部を取得できます。",
+					"その与えられた会話に対して文章の意味がわからない場合は適当に返信してください。",
+					"意味がわかる場合はその会話に交じるように返信してください。",
 					"返信は短くお願いします。",
+					"会話は以下のように与えられます。",
+					"名前: 会話内容",
+					"名前: <@名前>",
+					"<@名前>はそのユーザーに対するメンションです。その人について言及する際は名前だけを使ってください。",
+					"例えば<@山田>と書いてあった場合、その人の名前は山田です。",
 				}, "\n"),
 			})
 
 			for _, msg := range msgs {
+				for _, user := range msg.Mentions {
+					member, _ := s.GuildMember(m.GuildID, user.ID)
+					msg.Content = strings.ReplaceAll(msg.Content, fmt.Sprintf(func() string {
+						if m.Author.Bot {
+							return "<@!%s>"
+						} else {
+							return "<@%s>"
+						}
+					}(), user.ID), fmt.Sprintf("<@%s>", member.DisplayName()))
+				}
 				if msg.Author.ID == s.State.User.ID {
 					messages = append(messages, openai.ChatCompletionMessage{
 						Role:    openai.ChatMessageRoleAssistant,
@@ -211,9 +116,10 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 				} else {
 					messages = append(messages, openai.ChatCompletionMessage{
 						Role:    openai.ChatMessageRoleUser,
-						Content: msg.Content,
+						Content: fmt.Sprintf("%s: %s", DisplayName(), msg.Content),
 					})
 				}
+				fmt.Printf("%s: %s\n", DisplayName(), msg.Content)
 			}
 
 			client := openai.NewClient(os.Getenv("CHATGPT_KEY"))
@@ -241,18 +147,13 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}
 
-	var onMention = false
-	for _, user := range m.Mentions {
-		if user.ID == s.State.User.ID {
-			onMention = true
-			break
-		}
-	}
-	if onMention {
-		//msg, _ := s.ChannelMessageSend(m.ChannelID, "回答を生成中...")
-		//gemini.GenerateContentStream(context.Background(), m.Content)
-		//for gemini.Guwaa() {
-		//	_, _ = s.ChannelMessageEdit(msg.ChannelID, msg.ID, "回答を生成中...")
-		//}
-	}
+	//var onMention = false
+	//for _, user := range m.Mentions {
+	//	if user.ID == s.State.User.ID {
+	//		onMention = true
+	//		break
+	//	}
+	//}
+	//if onMention {
+	//}
 }
