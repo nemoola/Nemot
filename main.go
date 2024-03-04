@@ -48,21 +48,23 @@ func main() {
 	}
 }
 
+func DisplayName(s *discordgo.Session, guildID string, userID string) string {
+	m, _ := s.GuildMember(guildID, userID)
+	if m.Nick != "" {
+		return m.Nick
+	} else if m.User.Bot {
+		return m.User.Username
+	}
+	return m.User.GlobalName
+}
+
 func onReady(_ *discordgo.Session, _ *discordgo.Ready) {
 	fmt.Println("Bot is ready")
 }
 
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
-	if m.Author.ID == s.State.User.ID {
+	if m.Author.ID == s.State.User.ID || m.Author.Bot {
 		return
-	}
-
-	DisplayName := func() string {
-		if m.Member.Nick != "" {
-			return m.Member.Nick
-		} else {
-			return m.Author.GlobalName
-		}
 	}
 
 	if strings.HasPrefix(m.Content, prefix) {
@@ -74,7 +76,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			_, _ = s.ChannelMessageSend(m.ChannelID, "Unknown command")
 		}
 	} else {
-		if rnd, _ := rand.Int(rand.Reader, big.NewInt(100)); rnd.Int64() < 15 {
+		if rnd, _ := rand.Int(rand.Reader, big.NewInt(100)); rnd.Int64() < 10 {
 			msgs, _ := s.ChannelMessages(m.ChannelID, 3, "", "", "")
 			sort.Slice(msgs, func(i, j int) bool {
 				return msgs[j].Timestamp.After(msgs[i].Timestamp)
@@ -84,42 +86,50 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			messages = append(messages, openai.ChatCompletionMessage{
 				Role: openai.ChatMessageRoleSystem,
 				Content: strings.Join([]string{
-					fmt.Sprintf("あなたの名前は%sです。", DisplayName()),
-					"あなたは会話の一部を取得できます。",
-					"その与えられた会話に対して文章の意味がわからない場合は適当に返信してください。",
-					"意味がわかる場合はその会話に交じるように返信してください。",
-					"返信は短くお願いします。",
-					"会話は以下のように与えられます。",
+					fmt.Sprintf("あなたの名前は%sです。", DisplayName(s, m.GuildID, s.State.User.ID)),
+					"あなたは人が複数人いるグループチャットで会話を取得し、会話できます。",
+					"あなたは与えられた会話に対して自然な返信を生成してください。",
+					"会話の意味や意図が理解できない場合は、適当に反応してください。",
+					"会話の口調は友達と話しているような感じでお願いします。",
+					"返信は短く、自然であることを心がけてください。",
+					"返信はテキスト形式で返してください。",
+					"テンプレートは以下の通りです。",
 					"名前: 会話内容",
-					"名前: <@名前>",
+					"以下は例です。",
+					"佐藤: こんにちは",
+					"山田: <@佐藤>こんにちは",
 					"<@名前>はそのユーザーに対するメンションです。その人について言及する際は名前だけを使ってください。",
-					"例えば<@山田>と書いてあった場合、その人の名前は山田です。",
+					`例えば"<@山田>"と書いてあった場合、その人の名前は"山田"です。`,
+					`"佐藤: <@Johnny>"と書いてあった場合は"佐藤"が"Johnny"に言及しています。`,
+					"以下は例です。",
+					"input: 佐藤: こんにちは",
+					"output: こんにちは",
 				}, "\n"),
 			})
 
 			for _, msg := range msgs {
 				for _, user := range msg.Mentions {
-					member, _ := s.GuildMember(m.GuildID, user.ID)
 					msg.Content = strings.ReplaceAll(msg.Content, fmt.Sprintf(func() string {
 						if m.Author.Bot {
 							return "<@!%s>"
 						} else {
 							return "<@%s>"
 						}
-					}(), user.ID), fmt.Sprintf("<@%s>", member.DisplayName()))
+					}(), user.ID), fmt.Sprintf("<@%s>", DisplayName(s, m.GuildID, user.ID)))
 				}
 				if msg.Author.ID == s.State.User.ID {
 					messages = append(messages, openai.ChatCompletionMessage{
 						Role:    openai.ChatMessageRoleAssistant,
+						Name:    msg.Author.ID,
 						Content: msg.Content,
 					})
 				} else {
 					messages = append(messages, openai.ChatCompletionMessage{
 						Role:    openai.ChatMessageRoleUser,
-						Content: fmt.Sprintf("%s: %s", DisplayName(), msg.Content),
+						Name:    msg.Author.ID,
+						Content: fmt.Sprintf("%s: %s", DisplayName(s, m.GuildID, msg.Author.ID), msg.Content),
 					})
 				}
-				fmt.Printf("%s: %s\n", DisplayName(), msg.Content)
 			}
 
 			client := openai.NewClient(os.Getenv("CHATGPT_KEY"))
