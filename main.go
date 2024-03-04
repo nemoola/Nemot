@@ -20,6 +20,7 @@ var (
 		"args": &commands.Args{},
 		"j2c":  &commands.J2c{},
 		"ping": &commands.Ping{},
+		"wiki": &commands.Wiki{},
 	}
 )
 

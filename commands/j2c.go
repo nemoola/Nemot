@@ -21,7 +21,7 @@ type Chinese struct {
 	} `json:"meanings"`
 }
 
-func (_ *J2c) Execute(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+func (J2c) Execute(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	client := openai.NewClient(os.Getenv("CHATGPT_KEY"))
 	resp, err := client.CreateChatCompletion(
 		context.Background(),
