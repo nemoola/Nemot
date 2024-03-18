@@ -16,12 +16,7 @@ import (
 
 var (
 	prefix     = ""
-	commandMap = map[string]commands.Command{
-		"args": &commands.Args{},
-		"j2c":  &commands.J2c{},
-		"ping": &commands.Ping{},
-		"wiki": &commands.Wiki{},
-	}
+	commandMap = commands.CommandList()
 )
 
 func main() {
@@ -74,7 +69,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		if command, exist := commandMap[commandName]; exist {
 			command.Execute(s, m, args)
 		} else {
-			_, _ = s.ChannelMessageSend(m.ChannelID, "Unknown command")
+			_, _ = s.ChannelMessageSend(m.ChannelID, "コマンドが見つかりませんでした。")
 		}
 	} else {
 		if rnd, _ := rand.Int(rand.Reader, big.NewInt(100)); rnd.Int64() < 10 {

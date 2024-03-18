@@ -86,6 +86,10 @@ func (wc *WikiClient) Search(title string) WikiResult {
 	return wc.GetPageContent(search.Query.Search[0].PageID)
 }
 
+func (Wiki) Help() string {
+	return "Wikipediaの検索結果を返します"
+}
+
 func (Wiki) Execute(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	wc := NewWikiClient()
 	result := wc.Search(args[0])

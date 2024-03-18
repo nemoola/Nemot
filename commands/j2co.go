@@ -10,22 +10,22 @@ import (
 	"strings"
 )
 
-type J2c struct{}
+type J2co struct{}
 
-type Chinese struct {
-	Chinese  string `json:"chinese"`
-	Reading  string `json:"reading"`
-	Meanings []struct {
+type Cantonese struct {
+	Cantonese string `json:"cantonese"`
+	Reading   string `json:"reading"`
+	Meanings  []struct {
 		Word    string `json:"word"`
 		Meaning string `json:"meaning"`
 	} `json:"meanings"`
 }
 
-func (J2c) Help() string {
-	return "日本語を中国語に変換します。"
+func (c J2co) Help() string {
+	return "日本語を広東語に変換します。"
 }
 
-func (J2c) Execute(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+func (J2co) Execute(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	client := openai.NewClient(os.Getenv("CHATGPT_KEY"))
 	resp, err := client.CreateChatCompletion(
 		context.Background(),
@@ -35,17 +35,17 @@ func (J2c) Execute(s *discordgo.Session, m *discordgo.MessageCreate, args []stri
 				{
 					Role: openai.ChatMessageRoleSystem,
 					Content: strings.Join([]string{
-						"あなたは私が簡体字の中国語を学習するために存在しています。",
-						"中文とピンインとそれぞれ意味を回答してください。",
+						"あなたは私が広東語を学習するために存在しています。",
+						"広東語の文章とピンインとそれぞれ意味を回答してください。",
 						"意味は日本語で答えてください。",
 						"回答はすべてjsonで返してください。",
 						"テンプレートは以下の通りです。",
-						`{"chinese":"", "reading":"", "meanings":[{"word":"", "meaning":""}]}`,
+						`{"cantonese":"", "reading":"", "meanings":[{"word":"", "meaning":""}]}`,
 						"以下は例です。",
 						"input: あなたは猫が好きですか？",
-						`output: {"chinese":"你喜欢猫吗？", "reading":"nǐ xǐ huān māo má？", "meanings":[{"word":"你", "meaning":"あなた"}, {"word":"喜欢", "meaning":"好き"}, {"word":"猫", "meaning":"猫"}, {"word":"吗", "meaning":"〜ですか？"}]}`,
+						`output: {"cantonese":"你鍾意貓嗎？", "reading":"nei5 zung1 ji3 maau1 maa1？", "meanings":[{"word":"你", "meaning":"あなた"}, {"word":"鍾意", "meaning":"好き"}, {"word":"猫", "meaning":"猫"}, {"word":"吗", "meaning":"〜ですか？"}]}`,
 						"input: 私は中国語を勉強中です",
-						`output: {"chinese":"我在学习中文", "reading":"wǒ zài xué xí zhōng wén", "meanings":[{"word":"我", "meaning":"私"}, {"word":"在", "meaning":"している"}, {"word":"学习", "meaning":"学ぶ"}, {"word":"中文", "meaning":"中国語"}]}`,
+						`output: {"cantonese":"我喺學習中文", "reading":"ngo5 hai2 hok6 zaap6 zung1 man4", "meanings":[{"word":"我", "meaning":"私"}, {"word":"喺", "meaning":"している"}, {"word":"學習", "meaning":"学ぶ"}, {"word":"中文", "meaning":"中国語"}]}`,
 					}, "\n"),
 				},
 				{
@@ -63,26 +63,26 @@ func (J2c) Execute(s *discordgo.Session, m *discordgo.MessageCreate, args []stri
 		return
 	}
 
-	var chinese Chinese
-	if err = json.Unmarshal([]byte(resp.Choices[0].Message.Content), &chinese); err != nil {
+	var cantonese Cantonese
+	if err = json.Unmarshal([]byte(resp.Choices[0].Message.Content), &cantonese); err != nil {
 		_, _ = s.ChannelMessageSend(m.ChannelID, err.Error())
 		return
 	}
 
 	embed := discordgo.MessageEmbed{}
 	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-		Name:  "中文",
-		Value: chinese.Chinese,
+		Name:  "広東語",
+		Value: cantonese.Cantonese,
 	})
 	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
 		Name:  "読み方",
-		Value: chinese.Reading,
+		Value: cantonese.Reading,
 	})
 	embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
 		Name: "意味",
 		Value: func() string {
 			var str string
-			for _, v := range chinese.Meanings {
+			for _, v := range cantonese.Meanings {
 				str += fmt.Sprintf("%s - %s\n", v.Word, v.Meaning)
 			}
 			return str
