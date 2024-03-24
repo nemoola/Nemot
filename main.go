@@ -28,6 +28,10 @@ func init() {
 
 	prefix = os.Getenv("PREFIX")
 
+	if _, err := os.Stat("assets"); !os.IsExist(err) {
+		_ = os.Mkdir("assets", 0777)
+	}
+
 	if _, err := os.Stat("assets/base_map_w.gif"); !os.IsExist(err) {
 		res, _ := http.Get("http://www.kmoni.bosai.go.jp/data/map_img/CommonImg/base_map_w.gif")
 		body, _ := io.ReadAll(res.Body)
