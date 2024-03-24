@@ -8,7 +8,9 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
 	"github.com/sashabaranov/go-openai"
+	"io"
 	"math/big"
+	"net/http"
 	"os"
 	"sort"
 	"strings"
@@ -19,13 +21,29 @@ var (
 	commandMap = commands.CommandList()
 )
 
-func main() {
+func init() {
 	if err := godotenv.Load(); err != nil {
 		panic(err)
 	}
 
 	prefix = os.Getenv("PREFIX")
 
+	if _, err := os.Stat("assets/base_map_w.gif"); !os.IsExist(err) {
+		res, _ := http.Get("http://www.kmoni.bosai.go.jp/data/map_img/CommonImg/base_map_w.gif")
+		body, _ := io.ReadAll(res.Body)
+		file, _ := os.Create("assets/base_map_w.gif")
+		_, _ = file.Write(body)
+	}
+
+	if _, err := os.Stat("assets/nied_jma_s_w_scale.gif"); !os.IsExist(err) {
+		res, _ := http.Get("http://www.kmoni.bosai.go.jp/data/map_img/ScaleImg/nied_jma_s_w_scale.gif")
+		body, _ := io.ReadAll(res.Body)
+		file, _ := os.Create("assets/nied_jma_s_w_scale.gif")
+		_, _ = file.Write(body)
+	}
+}
+
+func main() {
 	bot, err := discordgo.New(fmt.Sprintf("Bot %s", os.Getenv("DISCORD_TOKEN")))
 	if err != nil {
 		panic(err)

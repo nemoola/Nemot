@@ -18,5 +18,6 @@ func CommandList() map[string]Command {
 		"ping": &Ping{},
 		"wiki": &Wiki{},
 		"help": &Help{},
+		"rs":   &Rs{},
 	}
 }
