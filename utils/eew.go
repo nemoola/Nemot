@@ -49,6 +49,7 @@ func (eew *EEW) GenerateEEWIMG() bytes.Buffer {
 	res, _ = http.Get(urlBuilder.String())
 	shindoImg, _ := gif.Decode(res.Body)
 	if res.StatusCode != 200 {
+		time.Sleep(100 * time.Millisecond)
 		return eew.GenerateEEWIMG()
 	}
 
