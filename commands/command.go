@@ -11,13 +11,14 @@ type Command interface {
 
 func CommandList() map[string]Command {
 	return map[string]Command{
-		"args": &Args{},
-		"j2c":  &J2c{},
-		"j2co": &J2co{},
-		"c2j":  &C2j{},
-		"ping": &Ping{},
-		"wiki": &Wiki{},
-		"help": &Help{},
-		"rs":   &Rs{},
+		"args":    &Args{},
+		"j2c":     &J2c{},
+		"j2co":    &J2co{},
+		"c2j":     &C2j{},
+		"ping":    &Ping{},
+		"wiki":    &Wiki{},
+		"help":    &Help{},
+		"rs":      &Rs{},
+		"weather": &Weather{},
 	}
 }
